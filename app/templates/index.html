@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+      <h1 class="mb-4">Breast Cancer Case Intake</h1>
+      <p class="lead">
+        Use this form to capture electronic health record, pathology, and genomic
+        information for the current case. Later steps will augment this
+        submission with retrieval-augmented generation and LLM validation.
+      </p>
+      <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+
+        <section class="mb-4">
+          <h2 class="h4">EHR / Demographics</h2>
+          <div class="mb-3">
+            {{ form.demographics.patient_id.label(class="form-label") }}
+            {{ form.demographics.patient_id(class="form-control", placeholder="Internal identifier") }}
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              {{ form.demographics.age.label(class="form-label") }}
+              {{ form.demographics.age(class="form-control", placeholder="e.g. 54") }}
+            </div>
+            <div class="col-md-6 mb-3">
+              {{ form.demographics.sex.label(class="form-label") }}
+              {{ form.demographics.sex(class="form-select") }}
+            </div>
+          </div>
+          <div class="mb-3">
+            {{ form.demographics.clinical_notes.label(class="form-label") }}
+            {{ form.demographics.clinical_notes(class="form-control", rows=3) }}
+          </div>
+        </section>
+
+        <section class="mb-4">
+          <h2 class="h4">Pathology</h2>
+          <div class="mb-3">
+            {{ form.pathology.tumour_type.label(class="form-label") }}
+            {{ form.pathology.tumour_type(class="form-control") }}
+          </div>
+          <div class="mb-3">
+            {{ form.pathology.stage.label(class="form-label") }}
+            {{ form.pathology.stage(class="form-control") }}
+          </div>
+          <div class="mb-3">
+            {{ form.pathology.receptor_status.label(class="form-label") }}
+            {{ form.pathology.receptor_status(class="form-control", rows=3) }}
+          </div>
+        </section>
+
+        <section class="mb-4">
+          <h2 class="h4">Genomics</h2>
+          <div class="mb-3">
+            {{ form.genomics.sequencing_platform.label(class="form-label") }}
+            {{ form.genomics.sequencing_platform(class="form-control") }}
+          </div>
+          <div class="mb-3">
+            {{ form.genomics.variants.label(class="form-label") }}
+            {{ form.genomics.variants(class="form-control", rows=4) }}
+          </div>
+        </section>
+
+        <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}
