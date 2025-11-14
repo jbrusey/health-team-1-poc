@@ -1,9 +1,11 @@
 """Application routes for the Health Team 1 proof of concept."""
 from __future__ import annotations
 
-from flask import Blueprint, render_template
+import requests
+from flask import Blueprint, current_app, flash, render_template
 
-from .forms import CaseIntakeForm
+from .forms import CaseIntakeForm, LLMQueryForm
+from .llm import LLMError, generate_response
 
 bp = Blueprint("main", __name__)
 
@@ -19,3 +21,56 @@ def index():
         pass
 
     return render_template("index.html", form=form)
+
+
+@bp.route("/llm", methods=["GET", "POST"])
+def llm_prompt():
+    """Render a tool that forwards prompts to an LLM provider."""
+
+    form = LLMQueryForm()
+    provider_choices = _provider_choices()
+    form.provider.choices = provider_choices
+    if form.provider.data is None:
+        form.provider.data = current_app.config.get("LLM_DEFAULT_PROVIDER", "ollama")
+
+    if not form.model.data:
+        # Pre-populate with the configured default model to show what will be used.
+        default_model = _default_model_for_provider(form.provider.data)
+        if default_model:
+            form.model.data = default_model
+
+    response_text: str | None = None
+    if form.validate_on_submit():
+        try:
+            response_text = generate_response(
+                form.prompt.data,
+                provider=form.provider.data,
+                model=form.model.data or None,
+            )
+        except LLMError as exc:
+            flash(str(exc), "danger")
+        except requests.RequestException as exc:
+            flash(f"Unable to contact LLM provider: {exc}", "danger")
+
+    return render_template("llm.html", form=form, response=response_text)
+
+
+def _provider_choices() -> list[tuple[str, str]]:
+    """Return the providers exposed to the user."""
+
+    configured = current_app.config.get(
+        "LLM_PROVIDER_CHOICES",
+        {
+            "ollama": "Ollama (local)",
+            "openai": "OpenAI ChatGPT",
+        },
+    )
+    return list(configured.items())
+
+
+def _default_model_for_provider(provider: str | None) -> str | None:
+    if provider == "ollama":
+        return current_app.config.get("LLM_OLLAMA_MODEL")
+    if provider == "openai":
+        return current_app.config.get("LLM_OPENAI_MODEL")
+    return None

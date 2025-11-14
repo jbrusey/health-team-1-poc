@@ -2,8 +2,15 @@
 from __future__ import annotations
 
 from flask_wtf import FlaskForm
-from wtforms import FieldList, FormField, SelectField, StringField, SubmitField, TextAreaField
-from wtforms.validators import Optional
+from wtforms import (
+    FieldList,
+    FormField,
+    SelectField,
+    StringField,
+    SubmitField,
+    TextAreaField,
+)
+from wtforms.validators import DataRequired, Optional
 
 
 class DemographicsForm(FlaskForm):
@@ -43,3 +50,12 @@ class CaseIntakeForm(FlaskForm):
     retrieved_case_ids = FieldList(StringField("Retrieved Case ID"), min_entries=0)
 
     submit = SubmitField("Save Draft")
+
+
+class LLMQueryForm(FlaskForm):
+    """Collect a prompt that will be sent to an LLM provider."""
+
+    provider = SelectField("Provider", choices=[], validators=[DataRequired()])
+    prompt = TextAreaField("Prompt", validators=[DataRequired()], render_kw={"rows": 10})
+    model = StringField("Model override", description="Optional LLM model to use")
+    submit = SubmitField("Send to LLM")

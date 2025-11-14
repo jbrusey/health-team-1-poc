@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="row">
+    <div class="col-12 col-lg-10">
+      <h1 class="mb-4">LLM Playground</h1>
+      <p class="text-muted">
+        Paste or compose a long-form prompt, choose a provider, and send it to the configured
+        large language model. Responses are shown below the form.
+      </p>
+      <form method="post">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+          {{ form.provider.label(class="form-label") }}
+          {{ form.provider(class="form-select") }}
+        </div>
+        <div class="mb-3">
+          {{ form.model.label(class="form-label") }}
+          {{ form.model(class="form-control", placeholder="Use configured default") }}
+          {% if form.model.description %}
+            <div class="form-text">{{ form.model.description }}</div>
+          {% endif %}
+        </div>
+        <div class="mb-3">
+          {{ form.prompt.label(class="form-label") }}
+          {{ form.prompt(class="form-control", placeholder="Enter a long-form prompt...") }}
+        </div>
+        {{ form.submit(class="btn btn-primary") }}
+      </form>
+
+      {% if response %}
+        <div class="card mt-4">
+          <div class="card-header">LLM response</div>
+          <div class="card-body">
+            <pre class="mb-0">{{ response }}</pre>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

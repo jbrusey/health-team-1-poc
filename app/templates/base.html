@@ -14,7 +14,11 @@
   <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <div class="container-fluid">
-        <span class="navbar-brand">Health Team 1</span>
+        <a class="navbar-brand" href="{{ url_for('main.index') }}">Health Team 1</a>
+        <div class="navbar-nav">
+          <a class="nav-link" href="{{ url_for('main.index') }}">Case intake</a>
+          <a class="nav-link" href="{{ url_for('main.llm_prompt') }}">LLM playground</a>
+        </div>
       </div>
     </nav>
 
