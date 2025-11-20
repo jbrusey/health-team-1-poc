@@ -1,4 +1,5 @@
 """Utility helpers for talking to different large language model APIs."""
+
 from __future__ import annotations
 
 import json
@@ -12,10 +13,14 @@ class LLMError(RuntimeError):
     """Raised when an LLM provider cannot return a response."""
 
 
-def generate_response(prompt: str, *, provider: str | None = None, model: str | None = None) -> str:
+def generate_response(
+    prompt: str, *, provider: str | None = None, model: str | None = None
+) -> str:
     """Send ``prompt`` to the configured provider and return the generated text."""
 
-    selected_provider = provider or current_app.config.get("LLM_DEFAULT_PROVIDER", "ollama")
+    selected_provider = provider or current_app.config.get(
+        "LLM_DEFAULT_PROVIDER", "ollama"
+    )
     if selected_provider == "ollama":
         return _generate_with_ollama(prompt, model=model)
     if selected_provider == "openai":
@@ -27,7 +32,7 @@ def _generate_with_ollama(prompt: str, *, model: str | None = None) -> str:
     host = current_app.config.get("LLM_OLLAMA_HOST", "localhost")
     port = current_app.config.get("LLM_OLLAMA_PORT", 11434)
     scheme = current_app.config.get("LLM_OLLAMA_SCHEME", "http")
-    default_model = current_app.config.get("LLM_OLLAMA_MODEL", "llama2")
+    default_model = current_app.config.get("LLM_OLLAMA_MODEL", "llama3.1:latest")
     timeout = current_app.config.get("LLM_REQUEST_TIMEOUT", 60)
     payload: dict[str, Any] = {
         "model": model or default_model,
@@ -38,7 +43,9 @@ def _generate_with_ollama(prompt: str, *, model: str | None = None) -> str:
         payload["options"] = options
 
     url = f"{scheme}://{host}:{port}/api/generate"
+    print(f"OLLAMA request to {url} with model {payload['model']}")  # Debug log
     response = requests.post(url, json=payload, timeout=timeout, stream=True)
+    print(f"OLLAMA response status: {response.status_code}")  # Debug log
     response.raise_for_status()
 
     chunks: list[str] = []
