@@ -25,17 +25,52 @@
           {{ form.prompt.label(class="form-label") }}
           {{ form.prompt(class="form-control", placeholder="Enter a long-form prompt...") }}
         </div>
-        {{ form.submit(class="btn btn-primary") }}
+        <div class="d-flex align-items-center gap-3">
+          {{ form.submit(class="btn btn-primary", id="llm-submit") }}
+          <div
+            id="llm-loading"
+            class="d-none text-secondary d-flex align-items-center gap-2"
+          >
+            <div class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></div>
+            <span>Sending prompt to the model&hellip;</span>
+          </div>
+        </div>
       </form>
 
       {% if response %}
         <div class="card mt-4">
           <div class="card-header">LLM response</div>
           <div class="card-body">
-            <pre class="mb-0">{{ response }}</pre>
+            <div class="markdown-body">
+              {{ response_html|safe if response_html else response }}
+            </div>
           </div>
         </div>
       {% endif %}
     </div>
   </div>
+
+  <style>
+    .markdown-body {
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+
+    .markdown-body p:last-child {
+      margin-bottom: 0;
+    }
+  </style>
+
+  <script>
+    const form = document.querySelector("form");
+    const submitButton = document.getElementById("llm-submit");
+    const loadingIndicator = document.getElementById("llm-loading");
+
+    form?.addEventListener("submit", () => {
+      if (!submitButton || !loadingIndicator) return;
+
+      submitButton.disabled = true;
+      loadingIndicator.classList.remove("d-none");
+    });
+  </script>
 {% endblock %}

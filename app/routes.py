@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import requests
 from flask import Blueprint, current_app, flash, render_template
+from markdown import markdown
+from markupsafe import Markup
 
 from .forms import CaseIntakeForm, LLMQueryForm
 from .llm import LLMError, generate_response
@@ -40,6 +42,7 @@ def llm_prompt():
             form.model.data = default_model
 
     response_text: str | None = None
+    response_html: Markup | None = None
     if form.validate_on_submit():
         try:
             response_text = generate_response(
@@ -47,12 +50,15 @@ def llm_prompt():
                 provider=form.provider.data,
                 model=form.model.data or None,
             )
+            response_html = _render_markdown(response_text)
         except LLMError as exc:
             flash(str(exc), "danger")
         except requests.RequestException as exc:
             flash(f"Unable to contact LLM provider: {exc}", "danger")
 
-    return render_template("llm.html", form=form, response=response_text)
+    return render_template(
+        "llm.html", form=form, response=response_text, response_html=response_html
+    )
 
 
 def _provider_choices() -> list[tuple[str, str]]:
@@ -74,3 +80,15 @@ def _default_model_for_provider(provider: str | None) -> str | None:
     if provider == "openai":
         return current_app.config.get("LLM_OPENAI_MODEL")
     return None
+
+
+def _render_markdown(content: str) -> Markup:
+    """Render Markdown to HTML while preserving simple formatting."""
+
+    return Markup(
+        markdown(
+            content,
+            extensions=["extra", "nl2br"],
+            output_format="html5",
+        )
+    )
