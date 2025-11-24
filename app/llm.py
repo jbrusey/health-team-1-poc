@@ -14,7 +14,11 @@ class LLMError(RuntimeError):
 
 
 def generate_response(
-    prompt: str, *, provider: str | None = None, model: str | None = None
+    prompt: str,
+    *,
+    provider: str | None = None,
+    model: str | None = None,
+    system_prompt: str | None = None,
 ) -> str:
     """Send ``prompt`` to the configured provider and return the generated text."""
 
@@ -22,13 +26,15 @@ def generate_response(
         "LLM_DEFAULT_PROVIDER", "ollama"
     )
     if selected_provider == "ollama":
-        return _generate_with_ollama(prompt, model=model)
+        return _generate_with_ollama(prompt, model=model, system_prompt=system_prompt)
     if selected_provider == "openai":
-        return _generate_with_openai(prompt, model=model)
+        return _generate_with_openai(prompt, model=model, system_prompt=system_prompt)
     raise LLMError(f"Unsupported LLM provider '{selected_provider}'.")
 
 
-def _generate_with_ollama(prompt: str, *, model: str | None = None) -> str:
+def _generate_with_ollama(
+    prompt: str, *, model: str | None = None, system_prompt: str | None = None
+) -> str:
     host = current_app.config.get("LLM_OLLAMA_HOST", "localhost")
     port = current_app.config.get("LLM_OLLAMA_PORT", 11434)
     scheme = current_app.config.get("LLM_OLLAMA_SCHEME", "http")
@@ -41,6 +47,9 @@ def _generate_with_ollama(prompt: str, *, model: str | None = None) -> str:
     options = current_app.config.get("LLM_OLLAMA_OPTIONS")
     if isinstance(options, dict):
         payload["options"] = options
+
+    if system_prompt:
+        payload["system"] = system_prompt
 
     url = f"{scheme}://{host}:{port}/api/generate"
     print(f"OLLAMA request to {url} with model {payload['model']}")  # Debug log
@@ -68,7 +77,9 @@ def _generate_with_ollama(prompt: str, *, model: str | None = None) -> str:
     return "".join(chunks).strip()
 
 
-def _generate_with_openai(prompt: str, *, model: str | None = None) -> str:
+def _generate_with_openai(
+    prompt: str, *, model: str | None = None, system_prompt: str | None = None
+) -> str:
     api_key = current_app.config.get("OPENAI_API_KEY")
     if not api_key:
         raise LLMError("OPENAI_API_KEY is not configured.")
@@ -81,13 +92,11 @@ def _generate_with_openai(prompt: str, *, model: str | None = None) -> str:
 
     payload = {
         "model": model or default_model,
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
+        "messages": [],
     }
+    if system_prompt:
+        payload["messages"].append({"role": "system", "content": system_prompt})
+    payload["messages"].append({"role": "user", "content": prompt})
     temperature = current_app.config.get("LLM_OPENAI_TEMPERATURE")
     if temperature is not None:
         payload["temperature"] = temperature

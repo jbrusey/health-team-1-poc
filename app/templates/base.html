@@ -18,11 +18,21 @@
         <div class="navbar-nav">
           <a class="nav-link" href="{{ url_for('main.index') }}">Case intake</a>
           <a class="nav-link" href="{{ url_for('main.llm_prompt') }}">LLM playground</a>
+          <a class="nav-link" href="{{ url_for('main.settings') }}">Settings</a>
         </div>
       </div>
     </nav>
 
     <main class="container py-4">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
       {% block content %}{% endblock %}
     </main>
   </body>

@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 import requests
-from flask import Blueprint, current_app, flash, render_template
+from flask import Blueprint, current_app, flash, redirect, render_template, session, url_for
 from markdown import markdown
 from markupsafe import Markup
 
-from .forms import CaseIntakeForm, LLMQueryForm
+from .forms import CaseIntakeForm, LLMQueryForm, SettingsForm
 from .llm import LLMError, generate_response
 
 bp = Blueprint("main", __name__)
@@ -41,6 +41,7 @@ def llm_prompt():
         if default_model:
             form.model.data = default_model
 
+    system_prompt = _current_system_prompt()
     response_text: str | None = None
     response_html: Markup | None = None
     if form.validate_on_submit():
@@ -49,6 +50,7 @@ def llm_prompt():
                 form.prompt.data,
                 provider=form.provider.data,
                 model=form.model.data or None,
+                system_prompt=system_prompt,
             )
             response_html = _render_markdown(response_text)
         except LLMError as exc:
@@ -57,8 +59,28 @@ def llm_prompt():
             flash(f"Unable to contact LLM provider: {exc}", "danger")
 
     return render_template(
-        "llm.html", form=form, response=response_text, response_html=response_html
+        "llm.html",
+        form=form,
+        response=response_text,
+        response_html=response_html,
+        system_prompt=system_prompt,
     )
+
+
+@bp.route("/settings", methods=["GET", "POST"])
+def settings():
+    """Allow runtime configuration of the system prompt."""
+
+    form = SettingsForm()
+    if not form.system_prompt.data:
+        form.system_prompt.data = _current_system_prompt()
+
+    if form.validate_on_submit():
+        session["system_prompt"] = form.system_prompt.data or ""
+        flash("Settings saved. Updated system prompt will be used for LLM requests.", "info")
+        return redirect(url_for("main.settings"))
+
+    return render_template("settings.html", form=form)
 
 
 def _provider_choices() -> list[tuple[str, str]]:
@@ -80,6 +102,13 @@ def _default_model_for_provider(provider: str | None) -> str | None:
     if provider == "openai":
         return current_app.config.get("LLM_OPENAI_MODEL")
     return None
+
+
+def _current_system_prompt() -> str | None:
+    prompt = session.get("system_prompt")
+    if prompt is not None:
+        return prompt
+    return current_app.config.get("LLM_SYSTEM_PROMPT")
 
 
 def _render_markdown(content: str) -> Markup:

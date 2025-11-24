@@ -59,3 +59,15 @@ class LLMQueryForm(FlaskForm):
     prompt = TextAreaField("Prompt", validators=[DataRequired()], render_kw={"rows": 10})
     model = StringField("Model override", description="Optional LLM model to use")
     submit = SubmitField("Send to LLM")
+
+
+class SettingsForm(FlaskForm):
+    """Application settings users can tweak at runtime."""
+
+    system_prompt = TextAreaField(
+        "System prompt",
+        description="Optional instruction sent to the LLM before the user prompt.",
+        render_kw={"rows": 6},
+        validators=[Optional()],
+    )
+    submit = SubmitField("Save settings")
