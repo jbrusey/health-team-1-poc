@@ -115,6 +115,41 @@
           {% endfor %}
         </div>
       {% endif %}
+
+      {% if aggregation_result %}
+        <div class="card mt-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="d-flex flex-column">
+              <span>Final agent summary</span>
+              <span class="small text-muted">
+                Aggregated by Agent {{ aggregation_result.agent_number or 1 }}
+                {% if aggregation_result.model %}(Model: {{ aggregation_result.model }}){% endif %}
+              </span>
+            </div>
+            {% if aggregation_result.port %}
+              <span class="badge text-bg-secondary">Port {{ aggregation_result.port }}</span>
+            {% endif %}
+          </div>
+          <div class="card-body">
+            {% if aggregation_system_prompt %}
+              <p class="text-muted small mb-2">Aggregation system prompt</p>
+              <div class="bg-light border rounded p-3 small mb-3" style="white-space: pre-wrap;">
+                {{ aggregation_system_prompt }}
+              </div>
+            {% endif %}
+
+            {% if aggregation_result.error %}
+              <div class="alert alert-danger mb-0">{{ aggregation_result.error }}</div>
+            {% elif aggregation_result.response %}
+              <div class="markdown-body">
+                {{ aggregation_result_html|safe if aggregation_result_html else aggregation_result.response }}
+              </div>
+            {% else %}
+              <p class="text-muted mb-0">No aggregation response returned.</p>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
     </div>
   </div>
 

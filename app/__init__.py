@@ -10,6 +10,13 @@ from typing import Callable
 from flask import Flask
 from dotenv import load_dotenv
 
+DEFAULT_AGGREGATION_SYSTEM_PROMPT = (
+    "Given the following JSON formatted responses to a medical query, "
+    "summarise both the recommendation and the consistency between different "
+    "agents. Highlight any marked differences. Similarly, summarise the "
+    "explanation, citation, and assumptions."
+)
+
 
 def create_app(test_config: dict | None = None) -> Flask:
     """Application factory used by Flask.
@@ -49,6 +56,9 @@ def create_app(test_config: dict | None = None) -> Flask:
         ),
         LLM_OPENAI_MODEL=os.environ.get("LLM_OPENAI_MODEL", "gpt-3.5-turbo"),
         LLM_OPENAI_TEMPERATURE=_safe_float(os.environ.get("LLM_OPENAI_TEMPERATURE")),
+        LLM_MULTI_AGENT_SUMMARY_PROMPT=os.environ.get(
+            "LLM_MULTI_AGENT_SUMMARY_PROMPT", DEFAULT_AGGREGATION_SYSTEM_PROMPT
+        ),
     )
 
     if test_config is not None:

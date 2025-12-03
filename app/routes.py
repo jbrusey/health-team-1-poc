@@ -9,7 +9,12 @@ from markdown import markdown
 from markupsafe import Markup
 
 from .forms import CaseIntakeForm, LLMQueryForm, MultiAgentQueryForm, SettingsForm
-from .llm import LLMError, generate_multi_agent_responses, generate_response
+from .llm import (
+    LLMError,
+    aggregate_agent_responses,
+    generate_multi_agent_responses,
+    generate_response,
+)
 
 bp = Blueprint("main", __name__)
 
@@ -79,17 +84,36 @@ def multi_llm_prompt():
     system_prompt = _current_system_prompt()
     system_prompt_preview = _system_prompt_preview(system_prompt)
     responses: list[dict[str, object]] = []
+    aggregation_result: dict[str, object] | None = None
+    aggregation_result_html: Markup | None = None
+    aggregation_system_prompt = _aggregation_system_prompt()
     query_agents = _current_query_agents()
 
     if form.validate_on_submit():
-        agent_results = generate_multi_agent_responses(
-            form.prompt.data,
-            query_agents=query_agents,
-            system_prompt=system_prompt,
-        )
-        for result in agent_results:
-            response_html = _render_markdown(result["response"]) if result.get("response") else None
-            responses.append({**result, "response_html": response_html})
+        try:
+            agent_results = generate_multi_agent_responses(
+                form.prompt.data,
+                query_agents=query_agents,
+                system_prompt=system_prompt,
+            )
+            for result in agent_results:
+                response_html = _render_markdown(result["response"]) if result.get("response") else None
+                responses.append({**result, "response_html": response_html})
+
+            aggregation_result = aggregate_agent_responses(
+                form.prompt.data,
+                agent_results,
+                query_agents=query_agents,
+                system_prompt=aggregation_system_prompt,
+            )
+            if aggregation_result.get("response"):
+                aggregation_result_html = _render_markdown(
+                    aggregation_result["response"]
+                )
+        except LLMError as exc:
+            flash(str(exc), "danger")
+        except requests.RequestException as exc:
+            flash(f"Unable to contact LLM provider: {exc}", "danger")
 
     return render_template(
         "multi_llm.html",
@@ -98,6 +122,9 @@ def multi_llm_prompt():
         system_prompt=system_prompt,
         system_prompt_preview=system_prompt_preview,
         query_agents=query_agents,
+        aggregation_result=aggregation_result,
+        aggregation_result_html=aggregation_result_html,
+        aggregation_system_prompt=aggregation_system_prompt,
     )
 
 
@@ -183,6 +210,10 @@ def _system_prompt_preview(prompt: str | None, max_lines: int = 3) -> str | None
         preview += "\n..."
 
     return preview
+
+
+def _aggregation_system_prompt() -> str | None:
+    return current_app.config.get("LLM_MULTI_AGENT_SUMMARY_PROMPT")
 
 
 def _render_markdown(content: str) -> Markup:

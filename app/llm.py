@@ -78,16 +78,6 @@ def generate_multi_agent_responses(
 
     results: list[dict[str, str | int | dict | None]] = []
 
-    def _merge_options(agent_options: dict[str, object]) -> dict[str, Any] | None:
-        merged: dict[str, Any] = dict(payload_options or {})
-        for key in ("temperature", "top_k", "top_p", "repeat_penalty"):
-            value = agent_options.get(key)
-            if value is not None:
-                merged[key] = value
-            elif key not in merged:
-                merged[key] = None
-        return merged or None
-
     def _request_agent(target_port: int, target_model: str, target_options: dict[str, Any] | None) -> str:
         return _send_ollama_request(
             host,
@@ -119,7 +109,7 @@ def generate_multi_agent_responses(
                 continue
 
             resolved_model = agent.get("model") or default_model
-            resolved_options = _merge_options(agent)
+            resolved_options = _merge_options(agent, payload_options)
             future_map[
                 executor.submit(
                     _request_agent, port, str(resolved_model), resolved_options
@@ -158,6 +148,104 @@ def generate_multi_agent_responses(
                 )
 
     return sorted(results, key=lambda item: item.get("index", 0))
+
+
+def aggregate_agent_responses(
+    prompt: str,
+    agent_results: list[dict[str, object]],
+    *,
+    query_agents: list[dict[str, object]] | None = None,
+    system_prompt: str | None = None,
+) -> dict[str, str | int | dict | None]:
+    """Summarise responses by forwarding them to a designated agent.
+
+    The first configured agent is used as the aggregation endpoint. The
+    provided ``system_prompt`` is applied to distinguish this request from the
+    user-facing prompt, and agent numbers are preserved in the payload sent to
+    the summariser.
+    """
+
+    host = current_app.config.get("LLM_OLLAMA_HOST", "localhost")
+    scheme = current_app.config.get("LLM_OLLAMA_SCHEME", "http")
+    timeout = current_app.config.get("LLM_REQUEST_TIMEOUT", 60)
+    configured_agents = query_agents or current_app.config.get("QUERY_AGENTS", [])
+    default_model = current_app.config.get("LLM_OLLAMA_MODEL", "llama3.1:latest")
+    options = current_app.config.get("LLM_OLLAMA_OPTIONS")
+    payload_options = options if isinstance(options, dict) else None
+
+    if not configured_agents:
+        return {
+            "response": None,
+            "error": "No aggregator agent is configured.",
+            "model": None,
+            "port": None,
+            "agent_number": None,
+            "options": None,
+        }
+
+    aggregator = configured_agents[0]
+    try:
+        port = int(aggregator.get("port"))
+    except (TypeError, ValueError):
+        return {
+            "response": None,
+            "error": "Aggregator agent is missing a valid port.",
+            "model": None,
+            "port": None,
+            "agent_number": None,
+            "options": None,
+        }
+
+    resolved_model = aggregator.get("model") or default_model
+    resolved_options = _merge_options(aggregator, payload_options)
+
+    aggregation_payload = {
+        "prompt": prompt,
+        "agent_responses": [
+            {
+                "agent_number": idx + 1,
+                "port": result.get("port"),
+                "model": result.get("model"),
+                "response": result.get("response"),
+                "error": result.get("error"),
+            }
+            for idx, result in enumerate(agent_results)
+        ],
+    }
+
+    aggregation_prompt = (
+        "Summarise the following multi-agent outputs. Maintain references to agent numbers.\n"
+        f"{json.dumps(aggregation_payload, indent=2)}"
+    )
+
+    try:
+        summary = _send_ollama_request(
+            host,
+            port,
+            scheme,
+            aggregation_prompt,
+            str(resolved_model),
+            system_prompt,
+            resolved_options,
+            timeout,
+        )
+        return {
+            "response": summary,
+            "error": None,
+            "model": resolved_model,
+            "port": port,
+            "agent_number": 1,
+            "options": resolved_options,
+        }
+    except Exception as exc:  # pragma: no cover - defensive
+        return {
+            "response": None,
+            "error": str(exc),
+            "model": resolved_model,
+            "port": port,
+            "agent_number": 1,
+            "options": resolved_options,
+        }
 
 
 def _generate_with_openai(
@@ -244,4 +332,22 @@ def _send_ollama_request(
     return "".join(chunks).strip()
 
 
-__all__ = ["generate_response", "generate_multi_agent_responses", "LLMError"]
+def _merge_options(
+    agent_options: dict[str, object], base_options: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    merged: dict[str, Any] = dict(base_options or {})
+    for key in ("temperature", "top_k", "top_p", "repeat_penalty"):
+        value = agent_options.get(key)
+        if value is not None:
+            merged[key] = value
+        elif key not in merged:
+            merged[key] = None
+    return merged or None
+
+
+__all__ = [
+    "generate_response",
+    "generate_multi_agent_responses",
+    "aggregate_agent_responses",
+    "LLMError",
+]
