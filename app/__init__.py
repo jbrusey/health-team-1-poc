@@ -1,4 +1,5 @@
 """Flask application factory for the Health Team 1 proof of concept."""
+
 from __future__ import annotations
 
 import json
@@ -30,8 +31,11 @@ def create_app(test_config: dict | None = None) -> Flask:
         LLM_OLLAMA_HOST=os.environ.get("LLM_OLLAMA_HOST", "localhost"),
         LLM_OLLAMA_PORT=int(os.environ.get("LLM_OLLAMA_PORT", 11434)),
         LLM_OLLAMA_SCHEME=os.environ.get("LLM_OLLAMA_SCHEME", "http"),
-        LLM_OLLAMA_MODEL=os.environ.get("LLM_OLLAMA_MODEL", "llama3"),
+        LLM_OLLAMA_MODEL=os.environ.get("LLM_OLLAMA_MODEL", "gemma3:27b"),
         LLM_OLLAMA_OPTIONS=_safe_json(os.environ.get("LLM_OLLAMA_OPTIONS")),
+        MULTI_AGENT_OLLAMA_PORTS=_safe_port_list(
+            os.environ.get("LLM_MULTI_AGENT_PORTS"), [11434, 11435]
+        ),
         LLM_OPENAI_URL=os.environ.get(
             "LLM_OPENAI_URL", "https://api.openai.com/v1/chat/completions"
         ),
@@ -76,6 +80,23 @@ def _safe_json(value: str | None) -> dict | None:
     if isinstance(loaded, dict):
         return loaded
     return None
+
+
+def _safe_port_list(value: str | None, default: list[int] | None = None) -> list[int]:
+    if not value:
+        return list(default or [])
+
+    ports: list[int] = []
+    for item in value.split(","):
+        stripped = item.strip()
+        if not stripped:
+            continue
+        try:
+            ports.append(int(stripped))
+        except ValueError:
+            continue
+
+    return ports or list(default or [])
 
 
 __all__ = ["create_app"]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 from typing import Any
 
@@ -40,41 +41,68 @@ def _generate_with_ollama(
     scheme = current_app.config.get("LLM_OLLAMA_SCHEME", "http")
     default_model = current_app.config.get("LLM_OLLAMA_MODEL", "llama3.1:latest")
     timeout = current_app.config.get("LLM_REQUEST_TIMEOUT", 60)
-    payload: dict[str, Any] = {
-        "model": model or default_model,
-        "prompt": prompt,
-    }
     options = current_app.config.get("LLM_OLLAMA_OPTIONS")
-    if isinstance(options, dict):
-        payload["options"] = options
 
-    if system_prompt:
-        payload["system"] = system_prompt
+    return _send_ollama_request(
+        host,
+        port,
+        scheme,
+        prompt,
+        model or default_model,
+        system_prompt,
+        options if isinstance(options, dict) else None,
+        timeout,
+    )
 
-    url = f"{scheme}://{host}:{port}/api/generate"
-    print(f"OLLAMA request to {url} with model {payload['model']}")  # Debug log
-    response = requests.post(url, json=payload, timeout=timeout, stream=True)
-    print(f"OLLAMA response status: {response.status_code}")  # Debug log
-    response.raise_for_status()
 
-    chunks: list[str] = []
-    for line in response.iter_lines():
-        if not line:
-            continue
-        data = json.loads(line)
-        if data.get("done"):
-            break
-        chunk = data.get("response")
-        if chunk:
-            chunks.append(chunk)
+def generate_multi_agent_responses(
+    prompt: str,
+    *,
+    model: str | None = None,
+    ports: list[int] | None = None,
+    system_prompt: str | None = None,
+) -> dict[int, dict[str, str | None]]:
+    """Send the prompt to multiple Ollama agents concurrently.
 
-    if not chunks:
-        data = response.json()
-        text = data.get("response")
-        if text:
-            chunks.append(text)
+    Returns a mapping of agent ports to dictionaries containing ``response`` and
+    ``error`` keys so the caller can render successful and failed agents.
+    """
 
-    return "".join(chunks).strip()
+    host = current_app.config.get("LLM_OLLAMA_HOST", "localhost")
+    scheme = current_app.config.get("LLM_OLLAMA_SCHEME", "http")
+    timeout = current_app.config.get("LLM_REQUEST_TIMEOUT", 60)
+    default_ports = current_app.config.get("MULTI_AGENT_OLLAMA_PORTS", [11434, 11435])
+    agent_ports = ports or default_ports
+    default_model = current_app.config.get("LLM_OLLAMA_MODEL", "llama3.1:latest")
+    options = current_app.config.get("LLM_OLLAMA_OPTIONS")
+    resolved_model = model or default_model
+    payload_options = options if isinstance(options, dict) else None
+
+    results: dict[int, dict[str, str | None]] = {}
+
+    def _request_agent(target_port: int) -> str:
+        return _send_ollama_request(
+            host,
+            target_port,
+            scheme,
+            prompt,
+            resolved_model,
+            system_prompt,
+            payload_options,
+            timeout,
+        )
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(agent_ports)) as executor:
+        future_map = {executor.submit(_request_agent, port): port for port in agent_ports}
+        for future in concurrent.futures.as_completed(future_map):
+            port = future_map[future]
+            try:
+                response_text = future.result()
+                results[port] = {"response": response_text, "error": None}
+            except Exception as exc:  # pragma: no cover - defensive
+                results[port] = {"response": None, "error": str(exc)}
+
+    return results
 
 
 def _generate_with_openai(
@@ -115,4 +143,50 @@ def _generate_with_openai(
         raise LLMError("Unexpected response from OpenAI API.") from exc
 
 
-__all__ = ["generate_response", "LLMError"]
+def _send_ollama_request(
+    host: str,
+    port: int,
+    scheme: str,
+    prompt: str,
+    model: str,
+    system_prompt: str | None,
+    options: dict[str, Any] | None,
+    timeout: int,
+) -> str:
+    payload: dict[str, Any] = {
+        "model": model,
+        "prompt": prompt,
+    }
+    if options:
+        payload["options"] = options
+
+    if system_prompt:
+        payload["system"] = system_prompt
+
+    url = f"{scheme}://{host}:{port}/api/generate"
+    print(f"OLLAMA request to {url} with model {payload['model']}")  # Debug log
+    response = requests.post(url, json=payload, timeout=timeout, stream=True)
+    print(f"OLLAMA response status: {response.status_code}")  # Debug log
+    response.raise_for_status()
+
+    chunks: list[str] = []
+    for line in response.iter_lines():
+        if not line:
+            continue
+        data = json.loads(line)
+        if data.get("done"):
+            break
+        chunk = data.get("response")
+        if chunk:
+            chunks.append(chunk)
+
+    if not chunks:
+        data = response.json()
+        text = data.get("response")
+        if text:
+            chunks.append(text)
+
+    return "".join(chunks).strip()
+
+
+__all__ = ["generate_response", "generate_multi_agent_responses", "LLMError"]

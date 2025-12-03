@@ -35,7 +35,7 @@ Additional folders such as `data/` and `vector_store/` will be created in later 
    uv run flask --app run:app --debug run
    ```
 
-The default server listens on http://127.0.0.1:5000/ and exposes a preliminary form for capturing EHR, pathology, and genomic details. A dedicated "LLM playground" page at `/llm` lets you send arbitrary prompts to the configured language model so you can experiment with the integration before wiring it into the intake workflow.
+The default server listens on http://127.0.0.1:5000/ and exposes a preliminary form for capturing EHR, pathology, and genomic details. A dedicated "LLM playground" page at `/llm` lets you send arbitrary prompts to the configured language model so you can experiment with the integration before wiring it into the intake workflow. A companion "Multi-agent" view at `/llm/multi` runs the same prompt through multiple Ollama agents so you can compare responses side-by-side.
 
 ### LLM configuration
 
@@ -47,6 +47,7 @@ LLM providers are driven by environment variables so you can switch between loca
 | `LLM_OLLAMA_HOST` / `LLM_OLLAMA_PORT` / `LLM_OLLAMA_SCHEME` | Connection info for the Ollama server. | `localhost` / `11434` / `http` |
 | `LLM_OLLAMA_MODEL` | Default Ollama model name (e.g., `llama3`, `mistral`). | `llama3` |
 | `LLM_OLLAMA_OPTIONS` | Optional JSON encoded dictionary of model options to pass through. | unset |
+| `LLM_MULTI_AGENT_PORTS` | Comma-separated list of Ollama ports to query in the multi-agent view. | `11434,11435` |
 | `LLM_OPENAI_MODEL` / `LLM_OPENAI_URL` / `LLM_OPENAI_TEMPERATURE` | Parameters for the ChatGPT-compatible endpoint. Requires `OPENAI_API_KEY`. | `gpt-3.5-turbo` / OpenAI chat completions URL / unset |
 | `LLM_REQUEST_TIMEOUT` | Request timeout in seconds for every provider. | `60` |
 

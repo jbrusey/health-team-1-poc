@@ -6,8 +6,8 @@ from flask import Blueprint, current_app, flash, redirect, render_template, sess
 from markdown import markdown
 from markupsafe import Markup
 
-from .forms import CaseIntakeForm, LLMQueryForm, SettingsForm
-from .llm import LLMError, generate_response
+from .forms import CaseIntakeForm, LLMQueryForm, MultiAgentQueryForm, SettingsForm
+from .llm import LLMError, generate_multi_agent_responses, generate_response
 
 bp = Blueprint("main", __name__)
 
@@ -64,6 +64,53 @@ def llm_prompt():
         response=response_text,
         response_html=response_html,
         system_prompt=system_prompt,
+    )
+
+
+@bp.route("/llm/multi", methods=["GET", "POST"])
+def multi_llm_prompt():
+    """Render a tool that sends a prompt to multiple Ollama agents."""
+
+    form = MultiAgentQueryForm()
+    system_prompt = _current_system_prompt()
+    responses: list[dict[str, object]] = []
+    agent_ports: list[int] = current_app.config.get(
+        "MULTI_AGENT_OLLAMA_PORTS", [11434, 11435]
+    )
+
+    if not form.model.data:
+        default_model = _default_model_for_provider("ollama")
+        if default_model:
+            form.model.data = default_model
+
+    if form.validate_on_submit():
+        agent_results = generate_multi_agent_responses(
+            form.prompt.data,
+            model=form.model.data or None,
+            ports=agent_ports,
+            system_prompt=system_prompt,
+        )
+        for port, result in sorted(agent_results.items()):
+            response_html = (
+                _render_markdown(result["response"])
+                if result.get("response")
+                else None
+            )
+            responses.append(
+                {
+                    "port": port,
+                    "response": result.get("response"),
+                    "response_html": response_html,
+                    "error": result.get("error"),
+                }
+            )
+
+    return render_template(
+        "multi_llm.html",
+        form=form,
+        responses=responses,
+        system_prompt=system_prompt,
+        agent_ports=agent_ports,
     )
 
 

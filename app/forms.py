@@ -61,6 +61,14 @@ class LLMQueryForm(FlaskForm):
     submit = SubmitField("Send to LLM")
 
 
+class MultiAgentQueryForm(FlaskForm):
+    """Send a single prompt to multiple Ollama agents."""
+
+    prompt = TextAreaField("Prompt", validators=[DataRequired()], render_kw={"rows": 10})
+    model = StringField("Model override", description="Optional LLM model to use")
+    submit = SubmitField("Send to all agents")
+
+
 class SettingsForm(FlaskForm):
     """Application settings users can tweak at runtime."""
 

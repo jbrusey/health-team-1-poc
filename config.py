@@ -11,6 +11,7 @@ class BaseConfig:
     SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     WTF_CSRF_ENABLED = True
+    MULTI_AGENT_OLLAMA_PORTS = [11434, 11435]
 
     # Folders used by the prototype. Paths are resolved relative to project root.
     PROJECT_ROOT = Path(__file__).resolve().parent
