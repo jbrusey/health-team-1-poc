@@ -5,18 +5,12 @@
     <div class="col-12 col-lg-10">
       <h1 class="mb-4">Multi-agent LLM Playground</h1>
       <p class="text-muted">
-        Send the same prompt to multiple independent Ollama agents running on different ports.
-        Use this page to compare responses side-by-side without re-entering your text.
+        Send the same prompt to multiple independent Ollama agents. Use this page to compare
+        responses side-by-side without re-entering your text. Agents are defined on the
+        <a href="{{ url_for('main.settings') }}">Settings</a> page.
       </p>
       <form method="post">
         {{ form.hidden_tag() }}
-        <div class="mb-3">
-          {{ form.model.label(class="form-label") }}
-          {{ form.model(class="form-control", placeholder="Use configured default") }}
-          {% if form.model.description %}
-            <div class="form-text">{{ form.model.description }}</div>
-          {% endif %}
-        </div>
         {% if system_prompt_preview %}
           <div class="alert alert-secondary" role="status">
             <div class="d-flex justify-content-between align-items-start">
@@ -46,10 +40,43 @@
             <span>Sending prompt to all agents&hellip;</span>
           </div>
         </div>
-        <p class="small text-muted mt-2 mb-0">
-          Target ports: {{ agent_ports | join(', ') }}
-        </p>
       </form>
+
+      {% if query_agents %}
+        <div class="card mt-4">
+          <div class="card-body">
+            <h2 class="h5">Configured query agents</h2>
+            <p class="text-muted small mb-3">These settings are applied before each request.</p>
+            <div class="table-responsive">
+              <table class="table align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">Agent</th>
+                    <th scope="col">Model</th>
+                    <th scope="col">Port</th>
+                    <th scope="col">Options</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for agent in query_agents %}
+                    <tr>
+                      <th scope="row">{{ loop.index }}</th>
+                      <td>{{ agent.model or 'Default' }}</td>
+                      <td>{{ agent.port }}</td>
+                      <td class="small text-muted">
+                        <div>temperature: {{ agent.temperature if agent.temperature is not none else 'default' }}</div>
+                        <div>top_k: {{ agent.top_k if agent.top_k is not none else 'default' }}</div>
+                        <div>top_p: {{ agent.top_p if agent.top_p is not none else 'default' }}</div>
+                        <div>repeat_penalty: {{ agent.repeat_penalty if agent.repeat_penalty is not none else 'default' }}</div>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      {% endif %}
 
       {% if responses %}
         <div class="row row-cols-1 row-cols-lg-2 g-3 mt-4">
@@ -57,10 +84,22 @@
             <div class="col">
               <div class="card h-100">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                  <span>Agent {{ loop.index }}</span>
+                  <div class="d-flex flex-column">
+                    <span>Agent {{ loop.index }}</span>
+                    <span class="small text-muted">Model: {{ agent.model }}</span>
+                  </div>
                   <span class="badge text-bg-secondary">Port {{ agent.port }}</span>
                 </div>
                 <div class="card-body">
+                  {% if agent.options %}
+                    <p class="text-muted small mb-3">
+                      Options:
+                      <span class="badge text-bg-light border">temperature {{ agent.options.temperature if agent.options.temperature is not none else 'default' }}</span>
+                      <span class="badge text-bg-light border">top_k {{ agent.options.top_k if agent.options.top_k is not none else 'default' }}</span>
+                      <span class="badge text-bg-light border">top_p {{ agent.options.top_p if agent.options.top_p is not none else 'default' }}</span>
+                      <span class="badge text-bg-light border">repeat_penalty {{ agent.options.repeat_penalty if agent.options.repeat_penalty is not none else 'default' }}</span>
+                    </p>
+                  {% endif %}
                   {% if agent.error %}
                     <div class="alert alert-danger mb-0">{{ agent.error }}</div>
                   {% elif agent.response %}

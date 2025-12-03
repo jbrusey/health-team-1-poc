@@ -58,51 +58,106 @@ def _generate_with_ollama(
 def generate_multi_agent_responses(
     prompt: str,
     *,
-    model: str | None = None,
-    ports: list[int] | None = None,
+    query_agents: list[dict[str, object]] | None = None,
     system_prompt: str | None = None,
-) -> dict[int, dict[str, str | None]]:
+) -> list[dict[str, str | int | dict | None]]:
     """Send the prompt to multiple Ollama agents concurrently.
 
-    Returns a mapping of agent ports to dictionaries containing ``response`` and
-    ``error`` keys so the caller can render successful and failed agents.
+    Returns a list of dictionaries containing metadata about each agent along
+    with ``response`` and ``error`` keys so the caller can render successful and
+    failed agents.
     """
 
     host = current_app.config.get("LLM_OLLAMA_HOST", "localhost")
     scheme = current_app.config.get("LLM_OLLAMA_SCHEME", "http")
     timeout = current_app.config.get("LLM_REQUEST_TIMEOUT", 60)
-    default_ports = current_app.config.get("MULTI_AGENT_OLLAMA_PORTS", [11434, 11435])
-    agent_ports = ports or default_ports
+    configured_agents = query_agents or current_app.config.get("QUERY_AGENTS", [])
     default_model = current_app.config.get("LLM_OLLAMA_MODEL", "llama3.1:latest")
     options = current_app.config.get("LLM_OLLAMA_OPTIONS")
-    resolved_model = model or default_model
     payload_options = options if isinstance(options, dict) else None
 
-    results: dict[int, dict[str, str | None]] = {}
+    results: list[dict[str, str | int | dict | None]] = []
 
-    def _request_agent(target_port: int) -> str:
+    def _merge_options(agent_options: dict[str, object]) -> dict[str, Any] | None:
+        merged: dict[str, Any] = dict(payload_options or {})
+        for key in ("temperature", "top_k", "top_p", "repeat_penalty"):
+            value = agent_options.get(key)
+            if value is not None:
+                merged[key] = value
+            elif key not in merged:
+                merged[key] = None
+        return merged or None
+
+    def _request_agent(target_port: int, target_model: str, target_options: dict[str, Any] | None) -> str:
         return _send_ollama_request(
             host,
             target_port,
             scheme,
             prompt,
-            resolved_model,
+            target_model,
             system_prompt,
-            payload_options,
+            target_options,
             timeout,
         )
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(agent_ports)) as executor:
-        future_map = {executor.submit(_request_agent, port): port for port in agent_ports}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(configured_agents) or 1) as executor:
+        future_map: dict[concurrent.futures.Future[str], dict[str, object]] = {}
+        for idx, agent in enumerate(configured_agents):
+            try:
+                port = int(agent.get("port"))
+            except (TypeError, ValueError):
+                results.append(
+                    {
+                        "port": None,
+                        "model": None,
+                        "options": None,
+                        "response": None,
+                        "error": "Agent configuration missing a valid port.",
+                        "index": idx,
+                    }
+                )
+                continue
+
+            resolved_model = agent.get("model") or default_model
+            resolved_options = _merge_options(agent)
+            future_map[
+                executor.submit(
+                    _request_agent, port, str(resolved_model), resolved_options
+                )
+            ] = {
+                "port": port,
+                "model": resolved_model,
+                "options": resolved_options,
+                "index": idx,
+            }
+
         for future in concurrent.futures.as_completed(future_map):
-            port = future_map[future]
+            metadata = future_map[future]
             try:
                 response_text = future.result()
-                results[port] = {"response": response_text, "error": None}
+                results.append(
+                    {
+                        "port": metadata["port"],
+                        "model": metadata["model"],
+                        "options": metadata["options"],
+                        "response": response_text,
+                        "error": None,
+                        "index": metadata["index"],
+                    }
+                )
             except Exception as exc:  # pragma: no cover - defensive
-                results[port] = {"response": None, "error": str(exc)}
+                results.append(
+                    {
+                        "port": metadata["port"],
+                        "model": metadata["model"],
+                        "options": metadata["options"],
+                        "response": None,
+                        "error": str(exc),
+                        "index": metadata["index"],
+                    }
+                )
 
-    return results
+    return sorted(results, key=lambda item: item.get("index", 0))
 
 
 def _generate_with_openai(

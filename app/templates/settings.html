@@ -16,6 +16,13 @@
             <div class="form-text">{{ form.system_prompt.description }}</div>
           {% endif %}
         </div>
+        <div class="mb-3">
+          {{ form.query_agents.label(class="form-label") }}
+          {{ form.query_agents(class="form-control", placeholder="[{\"port\": 11434, \"model\": \"gemma\"}]") }}
+          {% if form.query_agents.description %}
+            <div class="form-text">{{ form.query_agents.description }}</div>
+          {% endif %}
+        </div>
         {{ form.submit(class="btn btn-primary") }}
       </form>
     </div>

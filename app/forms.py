@@ -65,7 +65,6 @@ class MultiAgentQueryForm(FlaskForm):
     """Send a single prompt to multiple Ollama agents."""
 
     prompt = TextAreaField("Prompt", validators=[DataRequired()], render_kw={"rows": 10})
-    model = StringField("Model override", description="Optional LLM model to use")
     submit = SubmitField("Send to all agents")
 
 
@@ -77,5 +76,14 @@ class SettingsForm(FlaskForm):
         description="Optional instruction sent to the LLM before the user prompt.",
         render_kw={"rows": 6},
         validators=[Optional()],
+    )
+    query_agents = TextAreaField(
+        "Query agents",
+        description=(
+            "JSON list of agent definitions with port, model, temperature, top_k, "
+            "top_p, and repeat_penalty fields."
+        ),
+        render_kw={"rows": 8, "spellcheck": "false"},
+        validators=[DataRequired()],
     )
     submit = SubmitField("Save settings")

@@ -1,6 +1,8 @@
 """Application routes for the Health Team 1 proof of concept."""
 from __future__ import annotations
 
+import json
+
 import requests
 from flask import Blueprint, current_app, flash, redirect, render_template, session, url_for
 from markdown import markdown
@@ -77,36 +79,17 @@ def multi_llm_prompt():
     system_prompt = _current_system_prompt()
     system_prompt_preview = _system_prompt_preview(system_prompt)
     responses: list[dict[str, object]] = []
-    agent_ports: list[int] = current_app.config.get(
-        "MULTI_AGENT_OLLAMA_PORTS", [11434, 11435]
-    )
-
-    if not form.model.data:
-        default_model = _default_model_for_provider("ollama")
-        if default_model:
-            form.model.data = default_model
+    query_agents = _current_query_agents()
 
     if form.validate_on_submit():
         agent_results = generate_multi_agent_responses(
             form.prompt.data,
-            model=form.model.data or None,
-            ports=agent_ports,
+            query_agents=query_agents,
             system_prompt=system_prompt,
         )
-        for port, result in sorted(agent_results.items()):
-            response_html = (
-                _render_markdown(result["response"])
-                if result.get("response")
-                else None
-            )
-            responses.append(
-                {
-                    "port": port,
-                    "response": result.get("response"),
-                    "response_html": response_html,
-                    "error": result.get("error"),
-                }
-            )
+        for result in agent_results:
+            response_html = _render_markdown(result["response"]) if result.get("response") else None
+            responses.append({**result, "response_html": response_html})
 
     return render_template(
         "multi_llm.html",
@@ -114,7 +97,7 @@ def multi_llm_prompt():
         responses=responses,
         system_prompt=system_prompt,
         system_prompt_preview=system_prompt_preview,
-        agent_ports=agent_ports,
+        query_agents=query_agents,
     )
 
 
@@ -125,10 +108,27 @@ def settings():
     form = SettingsForm()
     if not form.system_prompt.data:
         form.system_prompt.data = _current_system_prompt()
+    if not form.query_agents.data:
+        form.query_agents.data = json.dumps(_current_query_agents(), indent=2)
 
     if form.validate_on_submit():
         session["system_prompt"] = form.system_prompt.data or ""
-        flash("Settings saved. Updated system prompt will be used for LLM requests.", "info")
+        try:
+            submitted_agents = json.loads(form.query_agents.data)
+        except json.JSONDecodeError:
+            flash("Query agents must be valid JSON.", "danger")
+            return render_template("settings.html", form=form)
+
+        normalized_agents = _normalize_query_agents(submitted_agents)
+        if not normalized_agents:
+            flash("Provide at least one query agent with a valid port.", "danger")
+            return render_template("settings.html", form=form)
+
+        session["query_agents"] = normalized_agents
+        flash(
+            "Settings saved. Updated system prompt and query agents will be used for LLM requests.",
+            "info",
+        )
         return redirect(url_for("main.settings"))
 
     return render_template("settings.html", form=form)
@@ -153,6 +153,13 @@ def _default_model_for_provider(provider: str | None) -> str | None:
     if provider == "openai":
         return current_app.config.get("LLM_OPENAI_MODEL")
     return None
+
+
+def _current_query_agents() -> list[dict]:
+    agents = session.get("query_agents")
+    if agents:
+        return _normalize_query_agents(agents)
+    return current_app.config.get("QUERY_AGENTS", [])
 
 
 def _current_system_prompt() -> str | None:
@@ -188,3 +195,43 @@ def _render_markdown(content: str) -> Markup:
             output_format="html5",
         )
     )
+
+
+def _normalize_query_agents(data: object) -> list[dict]:
+    if not isinstance(data, list):
+        return []
+
+    agents: list[dict] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        try:
+            port = int(item.get("port"))
+        except (TypeError, ValueError):
+            continue
+
+        agent = {
+            "port": port,
+            "model": str(item.get("model", "")) or None,
+            "temperature": _safe_float(item.get("temperature")),
+            "top_k": _safe_int(item.get("top_k")),
+            "top_p": _safe_float(item.get("top_p")),
+            "repeat_penalty": _safe_float(item.get("repeat_penalty")),
+        }
+        agents.append(agent)
+
+    return agents
+
+
+def _safe_float(value: object) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int(value: object) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None

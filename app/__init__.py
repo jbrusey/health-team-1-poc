@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import Callable
 
 from flask import Flask
 from dotenv import load_dotenv
@@ -35,6 +36,13 @@ def create_app(test_config: dict | None = None) -> Flask:
         LLM_OLLAMA_OPTIONS=_safe_json(os.environ.get("LLM_OLLAMA_OPTIONS")),
         MULTI_AGENT_OLLAMA_PORTS=_safe_port_list(
             os.environ.get("LLM_MULTI_AGENT_PORTS"), [11434, 11435]
+        ),
+        QUERY_AGENTS=_safe_query_agents(
+            os.environ.get("LLM_QUERY_AGENTS"),
+            lambda: _default_query_agents(
+                os.environ.get("LLM_MULTI_AGENT_PORTS"),
+                os.environ.get("LLM_OLLAMA_MODEL", "gemma3:27b"),
+            ),
         ),
         LLM_OPENAI_URL=os.environ.get(
             "LLM_OPENAI_URL", "https://api.openai.com/v1/chat/completions"
@@ -78,6 +86,72 @@ def _safe_json(value: str | None) -> dict | None:
     if isinstance(loaded, dict):
         return loaded
     return None
+
+
+def _safe_query_agents(
+    value: str | None, default_factory: Callable[[], list[dict]]
+) -> list[dict]:
+    if not value:
+        return default_factory()
+
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return default_factory()
+
+    if not isinstance(parsed, list):
+        return default_factory()
+
+    agents: list[dict] = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        try:
+            port = int(item["port"])
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        agents.append(
+            {
+                "port": port,
+                "model": str(item.get("model", "")) or None,
+                "temperature": _safe_float_value(item.get("temperature")),
+                "top_k": _safe_int_value(item.get("top_k")),
+                "top_p": _safe_float_value(item.get("top_p")),
+                "repeat_penalty": _safe_float_value(item.get("repeat_penalty")),
+            }
+        )
+
+    return agents or default_factory()
+
+
+def _default_query_agents(port_values: str | None, default_model: str) -> list[dict]:
+    ports = _safe_port_list(port_values, [11434, 11435])
+    return [
+        {
+            "port": port,
+            "model": default_model,
+            "temperature": None,
+            "top_k": None,
+            "top_p": None,
+            "repeat_penalty": None,
+        }
+        for port in ports
+    ]
+
+
+def _safe_float_value(value: object) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int_value(value: object) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _safe_port_list(value: str | None, default: list[int] | None = None) -> list[int]:
