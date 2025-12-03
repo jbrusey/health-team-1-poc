@@ -9,6 +9,7 @@ from typing import Callable
 
 from flask import Flask
 from dotenv import load_dotenv
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 DEFAULT_AGGREGATION_SYSTEM_PROMPT = (
     "Given the following JSON formatted responses to a medical query, "
@@ -30,6 +31,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     load_dotenv(project_root / ".env")
 
     app = Flask(__name__, instance_relative_config=True)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1, x_proto=1, x_host=1)
 
     app.config.from_mapping(
         SECRET_KEY=os.environ.get("FLASK_SECRET_KEY", "dev-secret-key"),
