@@ -20,4 +20,4 @@ build-backend = "hatchling.build"
 packages = ["app"]
 
 [tool.hatch.build.targets.sdist]
-include = ["app", "config.py", "run.py", "README.md"]
+include = ["app", "run.py", "README.md"]

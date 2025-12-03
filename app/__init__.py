@@ -45,8 +45,6 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     if test_config is not None:
         app.config.update(test_config)
-    else:
-        app.config.from_pyfile("config.py", silent=True)
 
     try:
         os.makedirs(app.instance_path, exist_ok=True)
