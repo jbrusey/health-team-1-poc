@@ -21,16 +21,19 @@
             <div class="form-text">{{ form.model.description }}</div>
           {% endif %}
         </div>
-        {% if system_prompt %}
+        {% if system_prompt_preview %}
           <div class="alert alert-secondary" role="status">
             <div class="d-flex justify-content-between align-items-start">
               <div>
                 <div class="fw-semibold">Active system prompt</div>
-                <div class="small text-muted">Configured from the Settings page.</div>
+                <div class="small text-muted">
+                  Showing the first few lines. View and edit the full prompt on the Settings
+                  page.
+                </div>
               </div>
               <a class="small" href="{{ url_for('main.settings') }}">Edit</a>
             </div>
-            <div class="mt-2 mb-0">{{ system_prompt|replace('\n', '<br>')|safe }}</div>
+            <div class="mt-2 mb-0">{{ system_prompt_preview|replace('\n', '<br>')|safe }}</div>
           </div>
         {% endif %}
         <div class="mb-3">

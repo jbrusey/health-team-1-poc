@@ -42,6 +42,7 @@ def llm_prompt():
             form.model.data = default_model
 
     system_prompt = _current_system_prompt()
+    system_prompt_preview = _system_prompt_preview(system_prompt)
     response_text: str | None = None
     response_html: Markup | None = None
     if form.validate_on_submit():
@@ -64,6 +65,7 @@ def llm_prompt():
         response=response_text,
         response_html=response_html,
         system_prompt=system_prompt,
+        system_prompt_preview=system_prompt_preview,
     )
 
 
@@ -73,6 +75,7 @@ def multi_llm_prompt():
 
     form = MultiAgentQueryForm()
     system_prompt = _current_system_prompt()
+    system_prompt_preview = _system_prompt_preview(system_prompt)
     responses: list[dict[str, object]] = []
     agent_ports: list[int] = current_app.config.get(
         "MULTI_AGENT_OLLAMA_PORTS", [11434, 11435]
@@ -110,6 +113,7 @@ def multi_llm_prompt():
         form=form,
         responses=responses,
         system_prompt=system_prompt,
+        system_prompt_preview=system_prompt_preview,
         agent_ports=agent_ports,
     )
 
@@ -156,6 +160,22 @@ def _current_system_prompt() -> str | None:
     if prompt is not None:
         return prompt
     return current_app.config.get("LLM_SYSTEM_PROMPT")
+
+
+def _system_prompt_preview(prompt: str | None, max_lines: int = 3) -> str | None:
+    """Return the first few lines of the system prompt for display."""
+
+    if not prompt:
+        return None
+
+    lines = prompt.splitlines()
+    preview_lines = lines[:max_lines]
+    preview = "\n".join(preview_lines)
+
+    if len(lines) > max_lines:
+        preview += "\n..."
+
+    return preview
 
 
 def _render_markdown(content: str) -> Markup:
