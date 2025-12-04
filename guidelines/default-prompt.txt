@@ -1,0 +1,389 @@
+Please always give your response in JSON format in the form of a dictionary with entries for recommendation, citation, reasoning, assumptions. the assumptions entry should outline any assumptions that were made (such as that the patient was female). do not list assumptions that are clearly stated in the query. 
+
+Make use of the following yaml formatted guidelines:
+
+guideline: "National Cancer Grid – Breast Cancer Management Guidelines 2019"
+version: "2019"
+format: "agent-rule-yaml"
+source: "NCG Breast Cancer PDF (pages as per file)"
+sections:
+
+  ###########################################################################
+  # 1. EVALUATION OF BREAST LUMP (pp.4–5)
+  ###########################################################################
+  evaluation_of_breast_lump:
+    rules:
+
+      - id: EL-001
+        if:
+          patient_has_breast_lump: true
+        then: perform_triple_test
+        citation: "p.4"
+
+      - id: EL-002
+        if:
+          imaging.ultrasound.lesion_type: "simple_cyst"
+        then:
+          - if_suspicious_features: biopsy
+          - else: discharge_follow_up_if_concern
+        citation: "p.4–5"
+
+      - id: EL-003
+        if:
+          lesion: "benign_looking_solid_mass"
+        then: biopsy_for_histopathology
+        citation: "p.4"
+
+      - id: EL-004
+        if:
+          lesion: "suspicious_solid_mass"
+        then: core_biopsy_image_guided_if_needed
+        citation: "p.4"
+
+      - id: EL-005
+        if:
+          triple_test_discordant: true
+        then: further_evaluation
+        citation: "p.5"
+
+  ###########################################################################
+  # 2. OPERABLE BREAST CANCER (pp.6–8)
+  ###########################################################################
+  operable_breast_cancer:
+    rules:
+
+      - id: OPC-001
+        if:
+          stage.T: ["Tis", "T1", "T2"]
+          stage.N: ["N0", "N1"]
+          stage.M: "M0"
+        then: histology_and_imaging_required
+        citation: "p.6"
+
+      - id: OPC-002
+        if:
+          staging_symptoms_of_metastasis: false
+          stage.T: ["T1", "T2"]
+          stage.N: ["N0", "N1"]
+          stage.M: "M0"
+        then: staging_investigations_not_indicated
+        citation: "p.6"
+
+      - id: OPC-003
+        if:
+          eligible_for_BCS: true
+        then: BCS_with_or_without_oncoplasty
+        citation: "p.6–7"
+
+      - id: OPC-004
+        if:
+          wants_BCS: true
+          eligible_for_BCS: false
+        then: neoadjuvant_chemotherapy
+        citation: "p.6"
+
+      - id: OPC-005
+        if:
+          clinically_node_negative: true
+        then: sentinel_lymph_node_biopsy_or_low_axillary_sampling
+        citation: "p.6"
+
+      - id: OPC-006
+        if:
+          SLN_positive: true
+        then: complete_axillary_dissection
+        citation: "p.6"
+
+      - id: OPC-007
+        if:
+          clinically_node_positive: true
+        then: complete_axillary_dissection
+        citation: "p.6"
+
+      - id: OPC-008
+        if:
+          post_NACT_downstaged_to_cN0: true
+        then: SLN_or_low_axillary_sampling_allowed
+        citation: "p.8"
+
+  ###########################################################################
+  # 3. LOCALLY ADVANCED BREAST CANCER (p.9)
+  ###########################################################################
+  locally_advanced_breast_cancer:
+    rules:
+
+      - id: LABC-001
+        if:
+          stage.T: ["T3","T4"]
+          OR_stage.N: ["N2","N3"]
+        then: diagnose_as_locally_advanced
+        citation: "p.9"
+
+      - id: LABC-002
+        if:
+          confirmed_locally_advanced: true
+        then: perform_metastatic_workup
+        citation: "p.9"
+
+      - id: LABC-003
+        if:
+          metastatic_disease: true
+        then: follow_metastatic_breast_cancer_pathway
+        citation: "p.9"
+
+      - id: LABC-004
+        if:
+          metastatic_disease: false
+        then: initiate_NACT_and_reassess_each_cycle
+        citation: "p.9"
+
+      - id: LABC-005
+        if:
+          maximal_response_achieved: true
+        then:
+          - if_BCS_feasible: BCS
+          - else: MRM
+        citation: "p.9"
+
+  ###########################################################################
+  # 4. SYSTEMIC THERAPY (EARLY BC) (pp.10–14)
+  ###########################################################################
+  systemic_therapy_early:
+    rules:
+
+      # ER/PR+, HER2–, T1/T2 N0
+      - id: ST-ER-001
+        if:
+          subtype: "ER/PR_positive_HER2_negative"
+          stage.T: ["T1","T2"]
+          stage.N: "N0"
+          risk.low_risk_criteria_met: true
+        then: endocrine_therapy_only
+        citation: "p.10"
+
+      - id: ST-ER-002
+        if:
+          subtype: "ER/PR_positive_HER2_negative"
+          NOT risk.low_risk_criteria_met: true
+        then: standard_adjuvant_chemotherapy
+        citation: "p.10"
+
+      # TNBC
+      - id: ST-TNBC-001
+        if:
+          subtype: "TNBC"
+          stage.T: ["T1","T2"]
+          stage.N: "N0"
+        then: chemo_regimens_AC_EC_taxanes_TC_CMF_CAF_CEF
+        citation: "p.10"
+
+      # HER2+
+      - id: ST-HER2-001
+        if:
+          subtype: "HER2_positive"
+        then: chemo_plus_trastuzumab_duration_6_to_12_months
+        citation: "p.10–14"
+
+      - id: ST-HER2-002
+        if:
+          subtype: "HER2_positive"
+          residual_invasive_disease_post_NACT: true
+        then: use_TDM1
+        citation: "p.14"
+
+  ###########################################################################
+  # 5. HORMONE THERAPY (p.13)
+  ###########################################################################
+  hormone_therapy:
+    rules:
+
+      - id: HT-001
+        if:
+          ER_or_PR_positive: true
+        then: start_after_chemo_and_continue_min_5_years
+        citation: "p.13"
+
+      - id: HT-002
+        if:
+          ER_or_PR_positive: true
+          menopausal_status: "premenopausal"
+        then:
+          - primary: tamoxifen_5_to_10y
+          - high_risk: tamoxifen_plus_ovarian_suppression
+        citation: "p.13"
+
+      - id: HT-003
+        if:
+          ER_or_PR_positive: true
+          menopausal_status: "postmenopausal"
+        then: AI_or_tamoxifen_based_on_risk
+        citation: "p.13"
+
+  ###########################################################################
+  # 6. RADIATION THERAPY (pp.15–17)
+  ###########################################################################
+  radiotherapy:
+    rules:
+
+      # Post-mastectomy
+      - id: RT-PM-001
+        if:
+          surgery: "mastectomy"
+          stage.T: "T3"
+          stage.N: "N0"
+        then: chest_wall_radiation
+        citation: "p.15"
+
+      - id: RT-PM-002
+        if:
+          surgery: "mastectomy"
+          stage.N: "N1"
+        then: chest_wall_RT_except_selected_low_risk
+        citation: "p.15"
+
+      - id: RT-PM-003
+        if:
+          surgery: "mastectomy"
+          stage.N: ["N2","N3"]
+        then: chest_wall_and_regional_nodes_RT
+        citation: "p.16"
+
+      # Post-BCS
+      - id: RT-BCS-001
+        if:
+          surgery: "BCS"
+        then: whole_breast_RT
+        citation: "p.15"
+
+      - id: RT-BCS-002
+        if:
+          surgery: "BCS"
+          high_grade_or_close_margins_or_age_le_50: true
+        then: add_boost_RT
+        citation: "p.16"
+
+  ###########################################################################
+  # 7. FOLLOW-UP (p.18)
+  ###########################################################################
+  follow_up:
+    rules:
+
+      - id: FU-001
+        if:
+          years_since_treatment: "<=5"
+        then: visit_every_3_to_6_months
+        citation: "p.18"
+
+      - id: FU-002
+        if:
+          years_since_treatment: "5_to_10"
+        then: annual_follow_up
+        citation: "p.18"
+
+      - id: FU-003
+        if:
+          years_since_treatment: ">10"
+        then: visit_every_2_years
+        citation: "p.18"
+
+      - id: FU-004
+        if: always
+        then:
+          - history_and_physical_exam_only
+          - mammography_every_12_to_24_months
+        citation: "p.18"
+
+  ###########################################################################
+  # 8. METASTATIC BREAST CANCER (pp.19–25)
+  ###########################################################################
+  metastatic_breast_cancer:
+    rules:
+
+      - id: MBC-001
+        if:
+          suspected_MBC: true
+        then:
+          - biopsy_if_feasible
+          - CECT_TAP
+          - bone_scan
+          - routine_labs
+        citation: "p.19"
+
+      # ER/PR+ HER2–
+      - id: MBC-ER-001
+        if:
+          subtype: "ER/PR_positive_HER2_negative"
+          low_burden: true
+        then: endocrine_therapy_plus_or_minus_CDK46
+        citation: "p.20–21,23"
+
+      - id: MBC-ER-002
+        if:
+          subtype: "ER/PR_positive_HER2_negative"
+          visceral_crisis: true
+        then: chemotherapy
+        citation: "p.20–21"
+
+      # HER2+
+      - id: MBC-HER2-001
+        if:
+          subtype: "HER2_positive"
+          line_of_therapy: "first"
+        then: taxane_plus_trastuzumab_plus_or_minus_pertuzumab
+        citation: "p.22"
+
+      - id: MBC-HER2-002
+        if:
+          subtype: "HER2_positive"
+          progression_on_trastuzumab: true
+        then: TDM1
+        citation: "p.22"
+
+      # TNBC
+      - id: MBC-TNBC-001
+        if:
+          subtype: "TNBC"
+        then: taxane_or_platinum_or_anthracycline_or_capecitabine_or_GC
+        citation: "p.24"
+
+  ###########################################################################
+  # 9. PALLIATIVE RADIOTHERAPY (pp.25–27)
+  ###########################################################################
+  palliative_radiotherapy:
+    rules:
+
+      - id: PRT-001
+        if:
+          site: "bone"
+          uncomplicated: true
+        then: give_8Gy_single_fraction
+        citation: "p.25"
+
+      - id: PRT-002
+        if:
+          site: "bone"
+          indication: ["impending_fracture","cord_compression","large_soft_tissue"]
+        then: give_20Gy_in_5_fractions
+        citation: "p.25"
+
+      - id: PRT-003
+        if:
+          site: "brain"
+          multiple_lesions: true
+        then: WBRT_20Gy_5fx_or_30Gy_10fx
+        citation: "p.27"
+
+      - id: PRT-004
+        if:
+          site: "brain"
+          single_lesion_and_controlled_primary: true
+        then: consider_SRS_or_surgery
+        citation: "p.27"
+
+definitions:
+  simple_cyst: "anechoic, thin-walled cyst without solid components"
+  BCS: "breast conserving surgery"
+  NACT: "neoadjuvant chemotherapy"
+  SLN: "sentinel lymph node"
+  residual_invasive_disease: "non-pCR following neoadjuvant therapy"
+  low_burden: "non-visceral crisis disease per p.20–21"
