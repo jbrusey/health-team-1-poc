@@ -121,28 +121,46 @@ def generate_multi_agent_responses(
                 "index": idx,
             }
 
-        for future in concurrent.futures.as_completed(future_map):
-            metadata = future_map[future]
-            try:
-                response_text = future.result()
-                results.append(
-                    {
-                        "port": metadata["port"],
-                        "model": metadata["model"],
-                        "options": metadata["options"],
-                        "response": response_text,
-                        "error": None,
-                        "index": metadata["index"],
-                    }
-                )
-            except Exception as exc:  # pragma: no cover - defensive
+        try:
+            for future in concurrent.futures.as_completed(
+                future_map, timeout=timeout
+            ):
+                metadata = future_map[future]
+                try:
+                    response_text = future.result()
+                    results.append(
+                        {
+                            "port": metadata["port"],
+                            "model": metadata["model"],
+                            "options": metadata["options"],
+                            "response": response_text,
+                            "error": None,
+                            "index": metadata["index"],
+                        }
+                    )
+                except Exception as exc:  # pragma: no cover - defensive
+                    results.append(
+                        {
+                            "port": metadata["port"],
+                            "model": metadata["model"],
+                            "options": metadata["options"],
+                            "response": None,
+                            "error": str(exc),
+                            "index": metadata["index"],
+                        }
+                    )
+        except concurrent.futures.TimeoutError:
+            for future, metadata in future_map.items():
+                if future.done():
+                    continue
+                future.cancel()
                 results.append(
                     {
                         "port": metadata["port"],
                         "model": metadata["model"],
                         "options": metadata["options"],
                         "response": None,
-                        "error": str(exc),
+                        "error": "Agent request exceeded configured timeout.",
                         "index": metadata["index"],
                     }
                 )
