@@ -255,6 +255,15 @@ def aggregate_agent_responses(
             "agent_number": 1,
             "options": resolved_options,
         }
+    except requests.Timeout:
+        return {
+            "response": None,
+            "error": "Aggregation request exceeded configured timeout.",
+            "model": resolved_model,
+            "port": port,
+            "agent_number": 1,
+            "options": resolved_options,
+        }
     except Exception as exc:  # pragma: no cover - defensive
         return {
             "response": None,
