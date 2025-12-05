@@ -47,8 +47,10 @@ LLM providers are driven by environment variables so you can switch between loca
 | `LLM_OLLAMA_MODEL` | Default Ollama model name (e.g., `llama3`, `mistral`). | `llama3` |
 | `LLM_OLLAMA_OPTIONS` | Optional JSON encoded dictionary of model options to pass through. | unset |
 | `LLM_MULTI_AGENT_PORTS` | Comma-separated list of Ollama ports to query in the multi-agent view. | `11434,11435` |
+| `LLM_QUERY_AGENTS` | JSON list of Ollama agents queried in the multi-agent view. | Three agents on ports 11434/11435 (gemma3:27b, phi4:latest, dolphin-mixtral:latest) |
 | `LLM_OPENAI_MODEL` / `LLM_OPENAI_URL` / `LLM_OPENAI_TEMPERATURE` | Parameters for the ChatGPT-compatible endpoint. Requires `OPENAI_API_KEY`. | `gpt-3.5-turbo` / OpenAI chat completions URL / unset |
 | `LLM_REQUEST_TIMEOUT` | Request timeout in seconds for every provider. | `60` |
 | `LLM_MULTI_AGENT_SUMMARY_PROMPT` | System prompt applied when summarising multi-agent responses with the final agent. | Preset aggregation prompt |
+| `LLM_SYSTEM_PROMPT` | System prompt prepended to user prompts. | Contents of `guidelines/default-prompt.txt` |
 
 Set these in `.env` to match your local Ollama hostname/port, preferred model, or to direct traffic to a different API such as ChatGPT.

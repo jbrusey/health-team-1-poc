@@ -18,6 +18,33 @@ DEFAULT_AGGREGATION_SYSTEM_PROMPT = (
     "explanation, citation, and assumptions."
 )
 
+DEFAULT_QUERY_AGENTS = [
+    {
+        "port": 11434,
+        "model": "gemma3:27b",
+        "temperature": 1.0,
+        "top_k": 1,
+        "top_p": 1.0,
+        "repeat_penalty": 1.1,
+    },
+    {
+        "port": 11435,
+        "model": "phi4:latest",
+        "temperature": 1.0,
+        "top_k": 1,
+        "top_p": 1.0,
+        "repeat_penalty": 1.1,
+    },
+    {
+        "port": 11435,
+        "model": "dolphin-mixtral:latest",
+        "temperature": 1.0,
+        "top_k": 1,
+        "top_p": 1.0,
+        "repeat_penalty": 1.1,
+    },
+]
+
 
 def create_app(test_config: dict | None = None) -> Flask:
     """Application factory used by Flask.
@@ -29,6 +56,10 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     project_root = Path(__file__).resolve().parent.parent
     load_dotenv(project_root / ".env")
+
+    default_system_prompt = _load_default_system_prompt(
+        project_root / "guidelines" / "default-prompt.txt"
+    )
 
     app = Flask(__name__, instance_relative_config=True)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_prefix=1, x_proto=1, x_host=1)
@@ -48,10 +79,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         ),
         QUERY_AGENTS=_safe_query_agents(
             os.environ.get("LLM_QUERY_AGENTS"),
-            lambda: _default_query_agents(
-                os.environ.get("LLM_MULTI_AGENT_PORTS"),
-                os.environ.get("LLM_OLLAMA_MODEL", "gemma3:27b"),
-            ),
+            _default_query_agents,
         ),
         LLM_OPENAI_URL=os.environ.get(
             "LLM_OPENAI_URL", "https://api.openai.com/v1/chat/completions"
@@ -60,6 +88,9 @@ def create_app(test_config: dict | None = None) -> Flask:
         LLM_OPENAI_TEMPERATURE=_safe_float(os.environ.get("LLM_OPENAI_TEMPERATURE")),
         LLM_MULTI_AGENT_SUMMARY_PROMPT=os.environ.get(
             "LLM_MULTI_AGENT_SUMMARY_PROMPT", DEFAULT_AGGREGATION_SYSTEM_PROMPT
+        ),
+        LLM_SYSTEM_PROMPT=_system_prompt_from_env(
+            os.environ.get("LLM_SYSTEM_PROMPT"), default_system_prompt
         ),
     )
 
@@ -137,19 +168,21 @@ def _safe_query_agents(
     return agents or default_factory()
 
 
-def _default_query_agents(port_values: str | None, default_model: str) -> list[dict]:
-    ports = _safe_port_list(port_values, [11434, 11435])
-    return [
-        {
-            "port": port,
-            "model": default_model,
-            "temperature": None,
-            "top_k": None,
-            "top_p": None,
-            "repeat_penalty": None,
-        }
-        for port in ports
-    ]
+def _default_query_agents() -> list[dict]:
+    return [agent.copy() for agent in DEFAULT_QUERY_AGENTS]
+
+
+def _load_default_system_prompt(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+
+def _system_prompt_from_env(value: str | None, default: str | None) -> str | None:
+    if value is not None:
+        return value
+    return default
 
 
 def _safe_float_value(value: object) -> float | None:
